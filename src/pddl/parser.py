@@ -1,6 +1,35 @@
 import re
 import argparse
-from src.pddl.pddl import Domain, Action, Type, Predicate
+from src.pddl.pddl import Domain, Action, Type, Predicate, Problem
+
+
+def get_text(start_word, text):
+    pos_start = text.find(start_word)
+    pos_end = pos_start
+    bracket_balance = 0
+    while bracket_balance >= 0:
+        pos_end += 1
+        if text[pos_end] == '(':
+            bracket_balance += 1
+        elif text[pos_end] == ')':
+            bracket_balance -= 1
+    return text[pos_start:pos_end]
+
+def split_paranthesis(text):
+    str = ""
+    in_bracket = False
+    list = []
+    for char in text:
+        if char == '(':
+            str = ""
+            in_bracket = True
+        elif char == ')':
+            list.append(str)
+            in_bracket = False
+        elif in_bracket:
+            str += char
+    return list
+
 
 class Parser:
     def __init__(self, domain_path):
@@ -10,33 +39,6 @@ class Parser:
         file_text = open(self.domain_path, "r").read()
         pos_start = file_text.find('domain')
         domain_name = file_text[pos_start:file_text.find(')', pos_start)].split()[1]
-
-        def get_text(start_word, text = file_text):
-            pos_start = text.find(start_word)
-            pos_end = pos_start + 1
-            bracket_balance = 0
-            while bracket_balance >= 0:
-                if text[pos_end] == '(':
-                    bracket_balance += 1
-                elif text[pos_end] == ')':
-                    bracket_balance -= 1
-                pos_end += 1
-            return text[pos_start:pos_end]
-
-        def split_paranthesis(text):
-            str = ""
-            in_bracket = False
-            list = []
-            for char in text:
-                if char == '(':
-                    str = ""
-                    in_bracket = True
-                elif char == ')':
-                    list.append(str)
-                    in_bracket = False
-                elif in_bracket:
-                    str += char
-            return list
 
         def parse_types(text):
             types = []
@@ -49,7 +51,7 @@ class Parser:
         def parse_predicates(text):
             predicates = []
             for str in split_paranthesis(text):
-                new_predicate = Predicate(str)
+                new_predicate = Predicate(str.split()[0], str.split()[1:])
                 predicates.append(new_predicate)
             return predicates
 
@@ -77,12 +79,43 @@ class Parser:
             actions.append(parse_action(get_text(':action', file_text[pos:])))
         types = []
         if file_text.find(':types') != -1:
-            types = parse_types(get_text(':types'))
+            types = parse_types(get_text(':types', file_text))
         predicates = []
         if file_text.find(':predicates') != -1:
-            predicates = parse_predicates(get_text(':predicates'))
+            predicates = parse_predicates(get_text(':predicates', file_text))
         domain = Domain(domain_name, types, predicates, actions)
         return domain
+
+    def parse_problem(self, domain, problem_path):
+        file_text = open(problem_path, "r").read()
+        pos_start = file_text.find('problem')
+        problem_name = file_text[pos_start:file_text.find(')', pos_start)].split()[1]
+
+        def parse_objects(text):
+            objects = []
+            for word in text.split():
+                if word[0] != ':' and word[0] != '-':
+                    objects.append(word)
+            return objects
+
+        def parse_init(text):
+            init = []
+            for str in split_paranthesis(text):
+                init.append(str)
+            return init
+
+        def parse_goal(text):
+            goal_text = get_text('(', text)
+            goal = split_paranthesis(goal_text[1:])
+            return goal
+
+        objects = []
+        if file_text.find(':objects') != -1:
+            objects = parse_objects(get_text(':objects', file_text))
+        init = parse_init(get_text(':init', file_text))
+        goal = parse_goal(get_text(':goal', file_text))
+        problem = Problem(problem_name, domain, objects, init, goal)
+        return problem
 
 
 if __name__ == '__main__':
@@ -92,5 +125,6 @@ if __name__ == '__main__':
     options = args.parse_args()
     parser = Parser(options.domain)
     domain = parser.parse_domain()
-    # domain.print()
-    # problem = parser.parse_problem(domain, options.problem)
+    domain.print()
+    problem = parser.parse_problem(domain, options.problem)
+    problem.print()
