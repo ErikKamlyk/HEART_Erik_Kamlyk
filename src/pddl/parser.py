@@ -173,8 +173,6 @@ class Parser:
                 for line in method_lines:
                     first_action_line = line.split(' -> ')[0]
                     second_action_line = line.split(' -> ')[1]
-                    print(first_action_line)
-                    print(second_action_line)
                     vertice = None
                     first_action = None
                     if first_action_line.split()[0] != 'init':
