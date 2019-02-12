@@ -58,6 +58,12 @@ class Domain:
             print("preconditions:", action.pre)
             print("effects_pos:", action.eff_pos)
             print("effects_neg:", action.eff_neg)
+            subactions = ""
+            if action.method != None:
+                for vertice in action.method.vertices:
+                    if vertice[0].name != 'init' and vertice[0].name != 'goal':
+                        subactions += vertice[0].name + " "
+                print("subactions:", subactions)
             print()
 
 class Problem:
