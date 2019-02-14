@@ -14,8 +14,14 @@ class Predicate:
     def __init__(self, name, signature):
         self.name = name
         self.signature = signature
+    def equal(self, predicate):
+        if predicate.name == self.name and predicate.signature == self.signature:
+            return True
+        else:
+            return False
     def __repr__(self):
-        return(self.name)
+        return(self.name + str(self.signature))
+    __str__ = __repr__
 
 class Method:
     def __init__(self, vertices, causal_links):

@@ -251,13 +251,13 @@ class Parser:
         objects = set()
 
         def parse_objects(text):
-            objects = set()
+            objects = []
             current_type = None
-            for word in reversed(text.split()):
+            for word in reversed(text.split()[1:]):
                 if find_type(word, domain.types):
                     current_type = find_type(word, domain.types)
                 elif word != "-":
-                    objects.add(Object(word, current_type))
+                    objects.append(Object(word, current_type))
             return objects
 
         def parse_init(text):
@@ -287,15 +287,3 @@ class Parser:
         goal = parse_goal(get_text(':goal', file_text))
         problem = Problem(problem_name, domain, objects, init, goal)
         return problem
-
-
-if __name__ == '__main__':
-    args = argparse.ArgumentParser()
-    args.add_argument(dest='domain', help='specify domain file')
-    args.add_argument(dest='problem', help='specify problem file')
-    options = args.parse_args()
-    parser = Parser(options.domain)
-    domain = parser.parse_domain()
-    domain.print()
-    problem = parser.parse_problem(domain, options.problem)
-    problem.print()
