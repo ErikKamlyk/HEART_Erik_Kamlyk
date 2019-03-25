@@ -1,3 +1,5 @@
+import copy
+
 class Type:
     def __init__(self, name, parent_type=None):
         self.name = name
@@ -19,14 +21,18 @@ class Predicate:
             return True
         else:
             return False
+    def __eq__(self, other):
+        if other.name == self.name and other.signature == self.signature:
+            return True
+        return False
     def __repr__(self):
         return(self.name + str(self.signature))
     __str__ = __repr__
 
 class Method:
     def __init__(self, vertices, causal_links):
-        self.vertices = vertices
-        self.causal_links = causal_links
+        self.vertices = vertices.copy()
+        self.causal_links = causal_links.copy()
 
 class Action:
     def __init__(self, name, parameters, pre, eff_pos, eff_neg, method=None):

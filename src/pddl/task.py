@@ -1,3 +1,5 @@
+import copy
+from src.pddl.pddl import Method
 
 from src.pddl.pddl import Predicate
 
@@ -24,11 +26,20 @@ class Operator:
         self.eff_neg = []
         for eff_neg in action.eff_neg:
             self.eff_neg.append(initialize_predicate(eff_neg, dict))
-        self.method = action.method
+        self.method = None
+        if action.method:
+            self.method = Method(action.method.vertices, action.method.causal_links)
+            for i in range(len(self.method.vertices)):
+                grounded_parameters = []
+                for parameter in self.method.vertices[i][1]:
+                    grounded_parameters.append(dict[parameter])
+                self.method.vertices[i] = (self.method.vertices[i][0], grounded_parameters)
         self.level = action.level
         self.str = self.name
         for parameter in self.parameters:
             self.str += " " + parameter.name
+    # def __eq__(self, other):
+    #     return self.name == other.name and self.parameters == other.parameters and self.action == other.action
     def __repr__(self):
         return self.name + self.parameters.__repr__()
 
@@ -41,9 +52,14 @@ class Task:
         self.init = init
         self.goals = goals
         self.operators = operators
+        self.subgoal_resolvers = {}
+        self.max_level = 0
+        for operator in operators:
+            if operator.level > self.max_level:
+                self.max_level = operator.level
     def __repr__(self):
         str = "\n"
         for operator in self.operators:
-            str += operator.__repr__()
+            str += "operator " + operator.__repr__()
             str += '\n'
         return str

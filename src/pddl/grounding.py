@@ -1,5 +1,6 @@
 from src.pddl.task import Task, Operator
 from src.pddl.pddl import Predicate
+from src.plan import SubgoalResolver
 
 def ground_action(action, types, index, types_dict, objects, operators, chosen_objects=[]):
     if index < len(types):
@@ -35,16 +36,16 @@ def sort_by_type(objects):
     return types_dict
 
 def get_facts(operators, goal):
-    facts = set()
+    facts = []
     for operator in operators:
         for precondition in operator.pre:
-            facts.add(precondition)
+            facts.append(precondition)
         for effect_pos in operator.eff_pos:
-            facts.add(effect_pos)
+            facts.append(effect_pos)
         for effect_neg in operator.eff_neg:
-            facts.add(effect_neg)
+            facts.append(effect_neg)
     for elem in goal:
-        facts.add(elem)
+        facts.append(elem)
     return facts
 
 def ground_init(init):
@@ -65,6 +66,24 @@ def ground_problem(problem):
     init = ground_init(problem.init)
     goals = ground_goal(problem.goal)
     operators = ground_actions(problem, types_dict)
+    for operator in operators:
+        if operator.method:
+            new_vertices = []
+            for vertice in operator.method.vertices:
+                for operator2 in operators:
+                    if vertice[0].name == operator2.name:
+                        if vertice[1] == operator2.parameters:
+                            new_vertices.append(operator2)
+                if vertice[0].name == 'init':
+                    new_vertices.append('init')
+                if vertice[0].name == 'goal':
+                    new_vertices.append('goal')
+            operator.method.vertices = new_vertices
     facts = get_facts(operators, goals)
     task = Task(problem.name, problem.domain, facts, objects, init, goals, operators)
+    for fact in facts:
+        task.subgoal_resolvers[fact.__repr__()] = []
+        for operator in operators:
+            if fact in operator.eff_pos:
+                task.subgoal_resolvers[fact.__repr__()].append(SubgoalResolver(operator, None))
     return task

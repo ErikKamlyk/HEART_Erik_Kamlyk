@@ -1,5 +1,4 @@
 import re
-import argparse
 from src.pddl.pddl import Domain, Action, Type, Predicate, Problem, Object, Method
 
 
@@ -67,7 +66,7 @@ class Parser:
         domain_name = file_text[pos_start:file_text.find(')', pos_start)].split()[1]
         types = set()
         actions = []
-        predicates = set()
+        predicates = []
         constants = set()
 
         def parse_types(text):
@@ -103,7 +102,7 @@ class Parser:
             return constants
 
         def parse_predicates(text):
-            predicates = set()
+            predicates = []
             for str in split_paranthesis(text):
                 parameters_words = str.split()[1:]
                 parameters = []
@@ -114,7 +113,7 @@ class Parser:
                     elif elem[0] != '-':
                         current_type = find_type(elem, types)
                 new_predicate = Predicate(str.split()[0], parameters)
-                predicates.add(new_predicate)
+                predicates.append(new_predicate)
             return predicates
 
         def parse_action(text):
@@ -177,7 +176,10 @@ class Parser:
                     first_action = None
                     if first_action_line.split()[0] != 'init':
                         first_action = find_action(first_action_line.split()[0], actions)
-                        vertice = (first_action, first_action_line.split()[1:])
+                        params = []
+                        for param in first_action_line.split()[1:]:
+                            params.append(find_object(param, parameters))
+                        vertice = (first_action, params)
                     else:
                         first_action = Action('init', None, None, None, None)
                         vertice = (first_action, [])
@@ -191,7 +193,10 @@ class Parser:
                     second_action = None
                     if second_action_line.split()[0] != 'goal':
                         second_action = find_action(second_action_line.split()[0], actions)
-                        vertice = (second_action, second_action_line.split()[1:])
+                        params = []
+                        for param in second_action_line.split()[1:]:
+                            params.append(find_object(param, parameters))
+                        vertice = (second_action, params)
                     else:
                         second_action = Action('goal', None, None, None, None)
                         vertice = (second_action, [])
