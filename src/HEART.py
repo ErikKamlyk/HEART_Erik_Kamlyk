@@ -13,16 +13,18 @@ def solve_flaw(f, plan):
     if type(f) is Subgoal:
         cur_max_level = -1
         other_resolvers = []
-        for resolver in plan.task.subgoal_resolvers[f.precondition.__repr__()]:
-            if resolver.operator not in plan.operators_not_free:
-                if resolver.operator.level > cur_max_level:
-                    cur_max_level = resolver.operator.level
-                    other_resolvers += resolvers
-                    resolvers = [resolver]
-                elif resolver.operator.level == cur_max_level:
-                    resolvers.append(resolver)
-                else:
-                    other_resolvers.append(resolver)
+        for operator in plan.operators_free:
+            if f.precondition in operator.eff_pos:
+                for eff in operator.eff_pos:
+                    if f.precondition.equal(eff):
+                        if operator.level > cur_max_level:
+                            cur_max_level = operator.level
+                            other_resolvers += resolvers
+                            resolvers = [SubgoalResolver(operator, None)]
+                        elif operator.level == cur_max_level:
+                            resolvers.append(SubgoalResolver(operator, None))
+                        else:
+                            other_resolvers.append(SubgoalResolver(operator, None))
         other_resolvers = []
         # for operator in plan.operators_free:
         #     if f.precondition in operator.eff_pos:
@@ -46,16 +48,11 @@ def solve_flaw(f, plan):
     return resolvers, [], []
 
 def count_flaws(f, plan):
+    result = solve_flaw(f, plan)
     resolvers = [0, 0]
     if type(f) is Subgoal:
-        for resolver in plan.task.subgoal_resolvers[f.precondition.__repr__()]:
-            if resolver.operator not in plan.operators_not_free:
-                resolvers[0] += 1
-        for step in plan.steps:
-            if not plan.isless(f.goal.num, step.num):
-                for eff in step.operator.eff_pos:
-                    if f.precondition.equal(eff):
-                        resolvers[1] += 1
+        resolvers[0] = len(result[0])
+        resolvers[1] = len(result[1])
         return resolvers
     elif type(f) is Threat:
         if (f.link.step1.name != "init") and not plan.isless(f.link.step1.num, f.step.num):

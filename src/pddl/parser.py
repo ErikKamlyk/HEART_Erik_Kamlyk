@@ -124,7 +124,7 @@ class Parser:
             pos_end = text.find(')', pos_start)
             parameters_words = text[pos_start + 1:pos_end].split()
             parameters = []
-            current_type = None
+            current_type = find_type('any', types)
             for elem in reversed(parameters_words):
                 if elem[0] == '?':
                     parameters.append(Object(elem, current_type))
@@ -257,7 +257,7 @@ class Parser:
 
         def parse_objects(text):
             objects = []
-            current_type = None
+            current_type = find_type('any', domain.types)
             for word in reversed(text.split()[1:]):
                 if find_type(word, domain.types):
                     current_type = find_type(word, domain.types)

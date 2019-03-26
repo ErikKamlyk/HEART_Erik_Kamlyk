@@ -81,9 +81,4 @@ def ground_problem(problem, heuristic):
             operator.method.vertices = new_vertices
     facts = get_facts(operators, goals)
     task = Task(problem.name, problem.domain, facts, objects, init, goals, operators, heuristic)
-    for fact in facts:
-        task.subgoal_resolvers[fact.__repr__()] = []
-        for operator in operators:
-            if fact in operator.eff_pos:
-                task.subgoal_resolvers[fact.__repr__()].append(SubgoalResolver(operator, None))
     return task

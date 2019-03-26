@@ -91,7 +91,7 @@ class Problem:
         print("name: " + self.name)
         print("domain name:", self.domain.name)
         for object in self.objects:
-            print("object:", object)
+            print("object:", object, "-", object.type.name)
         print()
         print("Init:")
         for elem in self.init:

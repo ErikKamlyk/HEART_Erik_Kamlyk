@@ -52,7 +52,6 @@ class Task:
         self.init = init
         self.goals = goals
         self.operators = operators
-        self.subgoal_resolvers = {}
         self.max_level = 0
         self.heuristic = heuristic
         for operator in operators:
