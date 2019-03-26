@@ -4,7 +4,7 @@ from src.plan import SubgoalResolver
 
 def ground_action(action, types, index, types_dict, objects, operators, chosen_objects=[]):
     if index < len(types):
-        for object in types_dict[types[index]]:
+        for object in types_dict[types[index].name]:
             if object not in chosen_objects:
                 new_chosen_objects = list(chosen_objects)
                 new_chosen_objects.append(object)
@@ -24,15 +24,15 @@ def ground_actions(problem, types_dict):
 def sort_by_type(objects):
     types_dict = {}
     for object in objects:
-        if object.type not in types_dict:
-            types_dict[object.type] = set()
-        types_dict[object.type].add(object)
+        if object.type.name not in types_dict:
+            types_dict[object.type.name] = set()
+        types_dict[object.type.name].add(object)
         cur_type = object.type
         while cur_type.parent_type != None:
             cur_type = cur_type.parent_type
-            if cur_type not in types_dict:
-                types_dict[cur_type] = set()
-            types_dict[cur_type].add(object)
+            if cur_type.name not in types_dict:
+                types_dict[cur_type.name] = set()
+            types_dict[cur_type.name].add(object)
     return types_dict
 
 def get_facts(operators, goal):
@@ -60,7 +60,7 @@ def ground_goal(goal):
         new_goal.append(Predicate(elem[0].name, elem[1]))
     return new_goal
 
-def ground_problem(problem):
+def ground_problem(problem, heuristic):
     objects = problem.objects
     types_dict = sort_by_type(objects)
     init = ground_init(problem.init)
@@ -80,7 +80,7 @@ def ground_problem(problem):
                     new_vertices.append('goal')
             operator.method.vertices = new_vertices
     facts = get_facts(operators, goals)
-    task = Task(problem.name, problem.domain, facts, objects, init, goals, operators)
+    task = Task(problem.name, problem.domain, facts, objects, init, goals, operators, heuristic)
     for fact in facts:
         task.subgoal_resolvers[fact.__repr__()] = []
         for operator in operators:

@@ -127,6 +127,7 @@ class Plan:
         self.max_steps = 2
         self.reached_max = False
         self.max_level = max_level
+        self.heuristic = task.heuristic
     def get_n_steps(self):
         i = 0
         for key in self.order_more.keys():

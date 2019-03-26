@@ -11,9 +11,19 @@ import time
 def solve_flaw(f, plan):
     resolvers = []
     if type(f) is Subgoal:
+        cur_max_level = -1
+        other_resolvers = []
         for resolver in plan.task.subgoal_resolvers[f.precondition.__repr__()]:
             if resolver.operator not in plan.operators_not_free:
-                resolvers.append(resolver)
+                if resolver.operator.level > cur_max_level:
+                    cur_max_level = resolver.operator.level
+                    other_resolvers += resolvers
+                    resolvers = [resolver]
+                elif resolver.operator.level == cur_max_level:
+                    resolvers.append(resolver)
+                else:
+                    other_resolvers.append(resolver)
+        other_resolvers = []
         # for operator in plan.operators_free:
         #     if f.precondition in operator.eff_pos:
         #     # for eff in operator.eff_pos:
@@ -25,7 +35,7 @@ def solve_flaw(f, plan):
                 for eff in step.operator.eff_pos:
                     if f.precondition.equal(eff):
                         resolvers2.append(SubgoalResolver(None, step))
-        return resolvers, resolvers2
+        return resolvers, resolvers2, other_resolvers
     elif type(f) is Threat:
         if (f.link.step1.name != "init") and not plan.isless(f.link.step1.num, f.step.num):
             resolvers.append(ThreatResolver(f.step, f.link.step1))
@@ -33,7 +43,7 @@ def solve_flaw(f, plan):
             resolvers.append(ThreatResolver(f.link.step2, f.step))
     elif type(f) is Decomp_flaw:
         resolvers.append(f)
-    return resolvers, None
+    return resolvers, [], []
 
 def count_flaws(f, plan):
     resolvers = [0, 0]
@@ -56,7 +66,7 @@ def count_flaws(f, plan):
         resolvers.append(f)
     return resolvers, None
 
-def add_new_subgoals(plan, causal_link):
+def add_new_subgoals(causal_link):
     new_subgoals = []
     for precondition in causal_link.step1.operator.pre:
         new_subgoals.append(Subgoal(precondition, causal_link.step1))
@@ -90,7 +100,6 @@ def delete_invalidated_threats(plan):
     return invalidated_threats
 
 def apply(resolver, f, plan):
-    plan.build_order()
     if type(f) is Subgoal:
         changes = Changes()
         new_step = resolver.step
@@ -107,10 +116,9 @@ def apply(resolver, f, plan):
             add_order_res = plan.add_order(new_step.num, f.goal.num)
             if not add_order_res[0]:
                 return (False, changes)
-            plan.build_order()
             plan.agenda.subgoals.remove(f)
             changes.deleted_flaw = f
-            changes.new_subgoals = add_new_subgoals(plan, new_causal_link)
+            changes.new_subgoals = add_new_subgoals(new_causal_link)
             changes.new_threats = add_new_threats(plan, new_causal_link, new_step)
             changes.invalidated_threats = delete_invalidated_threats(plan)
             if add_order_res[1]:
@@ -189,76 +197,140 @@ def revert(plan, changes):
 
 def choose_flaw(plan):
     s = time.time()
-    if len(plan.agenda.threats) > 0:
-        f = random.sample(plan.agenda.threats, 1)[0]
-    elif len(plan.agenda.subgoals) > 0:
-        f = None
-        min = 1000000
-        for subgoal in plan.agenda.subgoals:
-            resolvers = count_flaws(subgoal, plan)
-            if resolvers[1] == 0:
-                if resolvers[0] < min:
-                    f = subgoal
-                    min = resolvers[0]
-        if min < 1000000:
-            e = time.time()
-            #print("time ", e - s)
+    if plan.heuristic == 'rand':
+        if len(plan.agenda.threats + plan.agenda.subgoals) > 0:
+            f = random.sample(plan.agenda.threats + plan.agenda.subgoals, 1)[0]
+        else:
+            f = random.sample(plan.agenda.decomp_flaws, 1)[0]
+        return f
+    if plan.heuristic == 'threat_first':
+        if len(plan.agenda.threats) > 0:
+            f = random.sample(plan.agenda.threats, 1)[0]
             return f
-        f = random.sample(plan.agenda.subgoals, 1)[0]
-    else:
-        f = random.sample(plan.agenda.decomp_flaws, 1)[0]
+        elif len(plan.agenda.subgoals) > 0:
+            f = random.sample(plan.agenda.subgoals, 1)[0]
+        else:
+            f = random.sample(plan.agenda.decomp_flaws, 1)[0]
+        return f
+    if plan.heuristic == 'min_subgoal' or plan.heuristic == 'first_existing_link' or plan.heuristic == 'first_new_step':
+        if len(plan.agenda.threats) > 0:
+            f = random.sample(plan.agenda.threats, 1)[0]
+        elif len(plan.agenda.subgoals) > 0:
+            f = None
+            min = 1000000
+            for subgoal in plan.agenda.subgoals:
+                resolvers = count_flaws(subgoal, plan)
+                if resolvers[1] == 0:
+                    if resolvers[0] < min:
+                        f = subgoal
+                        min = resolvers[0]
+            if min < 1000000:
+                e = time.time()
+                #print("time ", e - s)
+                return f
+            f = random.sample(plan.agenda.subgoals, 1)[0]
+        else:
+            f = random.sample(plan.agenda.decomp_flaws, 1)[0]
+        return f
     e = time.time()
     #print("time ", e - s)
-    return f
 
-def pop_solve(plan, counter):
-    plan.build_order()
-    s = time.time()
-    if plan.agenda.empty():
-        return True
-    counter += 1
-    f = choose_flaw(plan)
-    resolvers, resolvers2 = solve_flaw(f, plan)
-    i = 0
-    while (len(resolvers) > 0 or (resolvers2 and len(resolvers2) > 0)) and i < 20:
-        i += 1
-        if type(f) == Threat:
+def choose_resolver(plan, f, resolvers, resolvers2, other_resolvers):
+    r = None
+    if type(f) == Threat:
+        r = random.sample(resolvers, 1)[0]
+        resolvers.remove(r)
+        return r
+    if type(f) == Decomp_flaw:
+        r = resolvers[0]
+        resolvers.remove(r)
+        return r
+    if plan.heuristic == 'rand' or plan.heuristic == 'threat_first' or plan.heuristic == 'min_subgoal':
+        r = random.sample(resolvers + resolvers2, 1)[0]
+        if r in resolvers:
+            resolvers.remove(r)
+        elif r in resolvers2:
+            resolvers2.remove(r)
+        return r
+    if plan.heuristic == 'first_existing_link':
+        if len(resolvers2) > 0:
+            r = random.sample(resolvers2, 1)[0]
+            resolvers2.remove(r)
+        elif len(resolvers) > 0:
             r = random.sample(resolvers, 1)[0]
             resolvers.remove(r)
-        elif type(f) == Subgoal:
-            if len(resolvers2) > 0:
-                r = random.sample(resolvers2, 1)[0]
-                resolvers2.remove(r)
-            else:
-                r = random.sample(resolvers, 1)[0]
-                resolvers.remove(r)
+            #print(resolvers)
+            # max_quality = -1000000
+            # for resolver in resolvers:
+            #     quality = -len(resolver.operator.pre)
+            #     #print(quality)
+            #     for precond in resolver.operator.pre:
+            #         if precond in plan.init.operator.eff_pos:
+            #             quality += 1
+            #     #print(quality)
+            #     if quality > max_quality:
+            #         max_quality = quality
+            #         r = resolver
+            #print(r)
+            #resolvers.remove(r)
         else:
-            r = resolvers[0]
+            r = random.sample(other_resolvers, 1)[0]
+            other_resolvers.remove(r)
+        return r
+    if plan.heuristic == 'first_new_step':
+        if len(resolvers) > 0:
+            r = random.sample(resolvers, 1)[0]
             resolvers.remove(r)
+        elif len(resolvers2) > 0:
+            r = random.sample(resolvers2, 1)[0]
+            resolvers2.remove(r)
+            #print(resolvers)
+            # max_quality = -1000000
+            # for resolver in resolvers:
+            #     quality = -len(resolver.operator.pre)
+            #     #print(quality)
+            #     for precond in resolver.operator.pre:
+            #         if precond in plan.init.operator.eff_pos:
+            #             quality += 1
+            #     #print(quality)
+            #     if quality > max_quality:
+            #         max_quality = quality
+            #         r = resolver
+            #print(r)
+            #resolvers.remove(r)
+        else:
+            r = random.sample(other_resolvers, 1)[0]
+            other_resolvers.remove(r)
+        return r
+
+def pop_solve(plan, counter):
+    if plan.agenda.empty():
+        return True
+    f = choose_flaw(plan)
+    flaw_resolvers = solve_flaw(f, plan)
+    while (len(flaw_resolvers[0]) > 0 or (len(flaw_resolvers[1]) > 0)) or (len(flaw_resolvers[2]) > 0):
+        r = choose_resolver(plan, f, flaw_resolvers[0], flaw_resolvers[1], flaw_resolvers[2])
         res = apply(r, f, plan)
         if res[0]:
-            e = time.time()
-            #print("time2 ", e - s, ", i=", i)
             if pop_solve(plan, counter):
                 return True
-            if type(f) != Decomp_flaw:
-                revert(plan, res[1])
+            revert(plan, res[1])
         else:
-            if type(f) != Decomp_flaw:
-                revert(plan, res[1])
+            revert(plan, res[1])
     return False
 
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
     args.add_argument(dest='domain', help='specify domain file')
     args.add_argument(dest='problem', help='specify problem file')
+    args.add_argument(dest='heuristic', help='specify heuristic')
     options = args.parse_args()
     parser = Parser(options.domain)
     domain = parser.parse_domain()
     domain.print()
     problem = parser.parse_problem(domain, options.problem)
     problem.print()
-    task = ground_problem(problem)
+    task = ground_problem(problem, options.heuristic)
     print(task)
     step_init = Operator(Action('init', problem.objects, [], problem.init, []), problem.objects)
     step_goal = Operator(Action('goal', problem.objects, problem.goal, [], []), problem.objects)
@@ -292,6 +364,9 @@ if __name__ == '__main__':
         solution = Solution(plan).get_sol()
         for i in range(1, len(solution)):
             plan.add_order(solution[i - 1], solution[i])
+        print("\nPlan of level ", plan.max_level, ":")
+        for step in solution:
+            print(plan.steps[step])
         while max_level > 0:
             plan.max_steps = 1000000
             max_level -= 1
@@ -300,6 +375,10 @@ if __name__ == '__main__':
                 if step.operator.level > max_level:
                     plan.agenda.decomp_flaws.append(Decomp_flaw(step.num))
             success = pop_solve(plan, 0)
+            solution = Solution(plan).get_sol()
+            print("\nPlan of level ", plan.max_level, ":")
+            for step in solution:
+                print(plan.steps[step])
         print("\nExample of plan execution:")
         steps_orig = copy.deepcopy(plan.steps)
         solution = Solution(plan).get_sol()

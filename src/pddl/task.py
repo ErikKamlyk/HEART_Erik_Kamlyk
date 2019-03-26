@@ -44,7 +44,7 @@ class Operator:
         return self.name + self.parameters.__repr__()
 
 class Task:
-    def __init__(self, name, domain, facts, objects, init, goals, operators):
+    def __init__(self, name, domain, facts, objects, init, goals, operators, heuristic):
         self.name = name
         self.domain = domain
         self.facts = facts
@@ -54,6 +54,7 @@ class Task:
         self.operators = operators
         self.subgoal_resolvers = {}
         self.max_level = 0
+        self.heuristic = heuristic
         for operator in operators:
             if operator.level > self.max_level:
                 self.max_level = operator.level
